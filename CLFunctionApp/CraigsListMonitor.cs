@@ -13,12 +13,15 @@ namespace CLFunctionApp
     {
         private readonly ILogger _logger;
         private readonly IConfiguration _configuration;
+        private readonly ICraigsListScraper _craigsListScraper;
 
         public CraigsListMonitor(ILoggerFactory loggerFactory,
-             IConfiguration configuration)
+             IConfiguration configuration,
+             ICraigsListScraper craigsListScraper)
         {
             _logger = loggerFactory.CreateLogger<CraigsListMonitor>();
             _configuration = configuration;
+            _craigsListScraper = craigsListScraper;
 
             var configurationDictionary = _configuration.GetChildren().ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
             ADDED_LISTINGS_DISCORD_WEBHOOK = configurationDictionary[nameof(ADDED_LISTINGS_DISCORD_WEBHOOK)];
@@ -78,8 +81,7 @@ namespace CLFunctionApp
                 var httpClient = new HttpClient();
                 var discordLogger = new DiscordLogger(httpClient);
 
-                var craigsListScraper = new CraigslistSearchResultFetcher();
-                var currentListings = await craigsListScraper.ScrapeListings(CRAIGSLIST_SEARCH_URL);
+                var currentListings = await _craigsListScraper.ScrapeListings(CRAIGSLIST_SEARCH_URL);
 
                 var blobClient = await GetListingsBlobClient();
 

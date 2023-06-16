@@ -1,14 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Http.Json;
-using System.Text;
+﻿using CLFunctionApp.Utility.cs;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace FunctionApp1.Utility.cs
 {
-    public class CraigslistSearchResultFetcher
+    public class CraigslistSearchResultAPIFetcher : ICraigsListScraper
     {
         public async Task<IDictionary<string, CraigsListProduct>> ScrapeListings(string url)
         {
