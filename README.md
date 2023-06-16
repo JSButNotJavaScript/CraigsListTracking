@@ -7,8 +7,6 @@ For logging of results to work correctly, you'll need to set up some configurati
 
 "ADDED_LISTINGS_DISCORD_WEBHOOK": "{Discord Webhook URL For New Postings}",
 
-"SOLD_LISTINGS_DISCORD_WEBHOOK": "{Discord Webhook URL For Sold Postings}",
-
 "MONITOR_HEALTH_DISCORD_WEBHOOK": "{Discord Webhook URL For Warning/Error Logging}",
 
 "CRAIGSLIST_SEARCH_URL": "{Search URL For Craigslist}" e.g "https://vancouver.craigslist.org/search/sss?query=honda%20civic"
