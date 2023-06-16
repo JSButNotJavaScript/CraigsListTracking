@@ -138,6 +138,7 @@ namespace CLFunctionApp
 
             if (!await blobClient.ExistsAsync())
             {
+                _logger.LogInformation("Blob does not exist. This should only happen on the first run. Returning empty dictionary");
                 return new Dictionary<string, CraigsListProduct>();
             }
 
@@ -167,7 +168,11 @@ namespace CLFunctionApp
 
             var response = await client.CreateIfNotExistsAsync();
 
-            _logger.LogInformation("Creating client if not exists: ", response);
+            if (!await client.ExistsAsync())
+            {
+                _logger.LogInformation("Created Blob Container");
+                await client.CreateAsync();
+            }
 
             return client;
         }
