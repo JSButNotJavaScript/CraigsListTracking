@@ -61,58 +61,65 @@ namespace CLFunctionApp
 
             )
         {
-            _logger.LogInformation($"C# Timer trigger function executed at: {DateTime.Now}");
-            _logger.LogInformation($"Next timer schedule at: {myTimer.ScheduleStatus.Next}");
-
-
-            var httpClient = new HttpClient();
-            var discordLogger = new DiscordLogger(httpClient);
-
-            var craigsListScraper = new CraigslistSearchResultFetcher();
-            var currentListings = await craigsListScraper.ScrapeListings(CRAIGSLIST_SEARCH_URL);
-
-            var blobClient = GetListingsBlobClient();
-
-            var previousListings = await GetPreviousListings(blobClient);
-
-            var newlyPostedListings = await ComparePreviousAndCurrentListings(currentListings, previousListings);
-
-            var anyNewPosts = newlyPostedListings.Count > 0;
-
-            if (anyNewPosts)
+            try
             {
-                var postDiscordMessageSucceeded = true;
+                _logger.LogInformation($"C# Timer trigger function executed at: {DateTime.Now}");
+                _logger.LogInformation($"Next timer schedule at: {myTimer.ScheduleStatus.Next}");
+
+
+                var httpClient = new HttpClient();
+                var discordLogger = new DiscordLogger(httpClient);
+
+                var craigsListScraper = new CraigslistSearchResultFetcher();
+                var currentListings = await craigsListScraper.ScrapeListings(CRAIGSLIST_SEARCH_URL);
+
+                var blobClient = await GetListingsBlobClient();
+
+                var previousListings = await GetPreviousListings(blobClient);
+
+                var newlyPostedListings = await ComparePreviousAndCurrentListings(currentListings, previousListings);
+
+                var anyNewPosts = newlyPostedListings.Count > 0;
+
                 if (anyNewPosts)
                 {
-                    var description = "**NEW/UPDATED LISTINGS:**  \n" + string.Join(" \n", newlyPostedListings.Select(l => $"{l.Url}  ${(l.Price)}"));
-                    var header = $"{newlyPostedListings.Count} NEW POSTS ";
-                    var title = $"Fender Search Total Results: {currentListings.Count}";
+                    var postDiscordMessageSucceeded = true;
+                    if (anyNewPosts)
+                    {
+                        var description = "**NEW/UPDATED LISTINGS:**  \n" + string.Join(" \n", newlyPostedListings.Select(l => $"{l.Url}  ${(l.Price)}"));
+                        var header = $"{newlyPostedListings.Count} NEW POSTS ";
+                        var title = $"Fender Search Total Results: {currentListings.Count}";
 
-                    postDiscordMessageSucceeded = await discordLogger.LogMesage(ADDED_LISTINGS_DISCORD_WEBHOOK, new DiscordMessage() { Description = description, Title = title, Header = header });
+                        postDiscordMessageSucceeded = await discordLogger.LogMesage(ADDED_LISTINGS_DISCORD_WEBHOOK, new DiscordMessage() { Description = description, Title = title, Header = header });
+                    }
+
+                    if (!postDiscordMessageSucceeded)
+                    {
+                        await discordLogger.LogMesage(MONITOR_HEALTH_DISCORD_WEBHOOK, new DiscordMessage() { Header = "FAILED TO POST UPDATE. ", Title = $"Previous listing had {previousListings.Count} results" });
+                    }
+
                 }
 
-                if (!postDiscordMessageSucceeded)
+                var loggingPeriodMinutes = 10;
+                // log health at most every _ minutes
+                if (DateTime.UtcNow.Minute % loggingPeriodMinutes == 0)
                 {
-                    await discordLogger.LogMesage(MONITOR_HEALTH_DISCORD_WEBHOOK, new DiscordMessage() { Header = "FAILED TO POST UPDATE. ", Title = $"Previous listing had {previousListings.Count} results" });
+                    await discordLogger.LogMesage(MONITOR_HEALTH_DISCORD_WEBHOOK, new DiscordMessage() { Header = "Azure Function still running. ", Title = $"Previous listing had {previousListings.Count} results" });
                 }
 
-            }
 
-            var loggingPeriodMinutes = 10;
-            // log health at most every _ minutes
-            if (DateTime.UtcNow.Minute % loggingPeriodMinutes == 0)
+                // store all listings that have been seen preivously
+                foreach (var listingKeyValue in previousListings)
+                {
+                    currentListings[listingKeyValue.Key] = listingKeyValue.Value;
+                }
+
+                await UploadProductsToBlob(currentListings, blobClient);
+            }
+            catch(Exception ex)
             {
-                await discordLogger.LogMesage(MONITOR_HEALTH_DISCORD_WEBHOOK, new DiscordMessage() { Header = "Azure Function still running. ", Title = $"Previous listing had {previousListings.Count} results" });
+                _logger.LogError(ex.Message, ex);
             }
-
-
-            // store all listings that have been seen preivously
-            foreach (var listingKeyValue in previousListings)
-            {
-                currentListings[listingKeyValue.Key] = listingKeyValue.Value;
-            }
-
-            await UploadProductsToBlob(currentListings, blobClient);
         }
 
         private async Task<Dictionary<string, CraigsListProduct>> GetPreviousListings(BlobClient blobClient)
@@ -133,18 +140,17 @@ namespace CLFunctionApp
             return dictionary;
         }
 
-        private BlobContainerClient BuildBlobContainerClient()
+        private async Task<BlobContainerClient> BuildBlobContainerClient()
         {
             var connString = _configuration.GetValue<string>("AzureWebJobsStorage");
             var client = new BlobContainerClient(connString, BLOB_CONTAINER_NAME);
+            await client.CreateIfNotExistsAsync();
             return client;
         }
 
-        private BlobClient GetListingsBlobClient()
+        private async Task<BlobClient> GetListingsBlobClient()
         {
-            var blobContainerClient = BuildBlobContainerClient();
-
-            blobContainerClient.CreateIfNotExists();
+            var blobContainerClient = await BuildBlobContainerClient();
 
             var blobClient = blobContainerClient.GetBlobClient(LISTINGS_BLOB_NAME);
 
