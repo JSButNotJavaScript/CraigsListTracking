@@ -21,10 +21,11 @@ namespace CLFunctionApp
             _configuration = configuration;
 
             var configurationDictionary = _configuration.GetChildren().ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-            ADDED_LISTINGS_DISCORD_WEBHOOK = configurationDictionary["ADDED_LISTINGS_DISCORD_WEBHOOK"];
-            SOLD_LISTINGS_DISCORD_WEBHOOK = configurationDictionary["SOLD_LISTINGS_DISCORD_WEBHOOK"];
-            MONITOR_HEALTH_DISCORD_WEBHOOK = configurationDictionary["MONITOR_HEALTH_DISCORD_WEBHOOK"];
-            CRAIGSLIST_SEARCH_URL = configurationDictionary["CRAIGSLIST_SEARCH_URL"];
+            ADDED_LISTINGS_DISCORD_WEBHOOK = configurationDictionary[nameof(ADDED_LISTINGS_DISCORD_WEBHOOK)];
+            SOLD_LISTINGS_DISCORD_WEBHOOK = configurationDictionary[nameof(SOLD_LISTINGS_DISCORD_WEBHOOK)];
+            MONITOR_HEALTH_DISCORD_WEBHOOK = configurationDictionary[nameof(MONITOR_HEALTH_DISCORD_WEBHOOK)];
+            CRAIGSLIST_SEARCH_URL = configurationDictionary[nameof(CRAIGSLIST_SEARCH_URL)];
+            LISTINGS_BLOB_NAME = configurationDictionary[nameof(LISTINGS_BLOB_NAME)] ?? "ListingDictionary";
         }
 
         /// <summary>
@@ -47,9 +48,10 @@ namespace CLFunctionApp
         /// </summary>
         private static string CRAIGSLIST_SEARCH_URL;
 
+        private static string LISTINGS_BLOB_NAME;
+
         private static readonly string BLOB_CONTAINER_NAME = "listings";
 
-        private static readonly string LISTINGS_BLOB_NAME = "ListingDictionary";
 
         // 0 * * * * *	every minute	09:00:00; 09:01:00; 09:02:00; � 10:00:00
         // 0 */5 * * * *	every 5 minutes	09:00:00; 09:05:00, ...
@@ -73,12 +75,11 @@ namespace CLFunctionApp
 
             var previousListings = await GetPreviousListings(blobClient);
 
-            var (newlyPostedListings, soldListings) = await ComparePreviousAndCurrentListings(currentListings, previousListings);
+            var newlyPostedListings = await ComparePreviousAndCurrentListings(currentListings, previousListings);
 
             var anyNewPosts = newlyPostedListings.Count > 0;
-            var anySoldPosts = soldListings.Count > 0;
 
-            if (anyNewPosts || anySoldPosts)
+            if (anyNewPosts)
             {
                 var postDiscordMessageSucceeded = true;
                 if (anyNewPosts)
@@ -90,25 +91,25 @@ namespace CLFunctionApp
                     postDiscordMessageSucceeded = await discordLogger.LogMesage(ADDED_LISTINGS_DISCORD_WEBHOOK, new DiscordMessage() { Description = description, Title = title, Header = header });
                 }
 
-                if (anySoldPosts)
-                {
-                    var description = "**SOLD LISTINGS: ** \n" + string.Join(" \n", soldListings.Select(l => $"{l.Url}  {(l.Price)}"));
-                    var header = $"{soldListings.Count} SOLD POSTS ";
-                    var title = $"Fender Search Total Results: {currentListings.Count}";
-
-                    postDiscordMessageSucceeded = await discordLogger.LogMesage(SOLD_LISTINGS_DISCORD_WEBHOOK, new DiscordMessage() { Description = description, Title = title, Header = header });
-
-                }
-
                 if (!postDiscordMessageSucceeded)
                 {
                     await discordLogger.LogMesage(MONITOR_HEALTH_DISCORD_WEBHOOK, new DiscordMessage() { Header = "FAILED TO POST UPDATE. ", Title = $"Previous listing had {previousListings.Count} results" });
                 }
 
             }
-            else
+
+            var loggingPeriodMinutes = 10;
+            // log health at most every _ minutes
+            if (DateTime.UtcNow.Minute % loggingPeriodMinutes == 0)
             {
                 await discordLogger.LogMesage(MONITOR_HEALTH_DISCORD_WEBHOOK, new DiscordMessage() { Header = "Azure Function still running. ", Title = $"Previous listing had {previousListings.Count} results" });
+            }
+
+
+            // store all listings that have been seen preivously
+            foreach (var listingKeyValue in previousListings)
+            {
+                currentListings[listingKeyValue.Key] = listingKeyValue.Value;
             }
 
             await UploadProductsToBlob(currentListings, blobClient);
@@ -132,7 +133,7 @@ namespace CLFunctionApp
             return dictionary;
         }
 
-        private BlobContainerClient GetCloudStorageAccount()
+        private BlobContainerClient BuildBlobContainerClient()
         {
             var connString = _configuration.GetValue<string>("AzureWebJobsStorage");
             var client = new BlobContainerClient(connString, BLOB_CONTAINER_NAME);
@@ -141,7 +142,9 @@ namespace CLFunctionApp
 
         private BlobClient GetListingsBlobClient()
         {
-            var blobContainerClient = GetCloudStorageAccount();
+            var blobContainerClient = BuildBlobContainerClient();
+
+            blobContainerClient.CreateIfNotExists();
 
             var blobClient = blobContainerClient.GetBlobClient(LISTINGS_BLOB_NAME);
 
@@ -155,14 +158,13 @@ namespace CLFunctionApp
         /// <param name="currentListings">current craigslist listings</param>
         /// <param name="previousListings">craigslist listings from the last run</param>
         /// <returns>lists of sold postings and newly added postings</returns>
-        private async Task<(IList<CraigsListProduct> newlyPostedListings, IList<CraigsListProduct> SoldListings)>
-            ComparePreviousAndCurrentListings(IDictionary<string, CraigsListProduct> currentListings, IDictionary<string, CraigsListProduct> previousListings)
+        private async Task<IList<CraigsListProduct>>
+           ComparePreviousAndCurrentListings(IDictionary<string, CraigsListProduct> currentListings, IDictionary<string, CraigsListProduct> previousListings)
         {
 
             var newlyPostedListings = currentListings.Values.Where(l => !previousListings.ContainsKey(l.Url)).ToList();
-            var soldListings = previousListings.Values.Where(l => !currentListings.ContainsKey(l.Url)).ToList();
 
-            return (newlyPostedListings, soldListings);
+            return newlyPostedListings;
         }
 
         private async Task<bool> UploadProductsToBlob(IDictionary<string, CraigsListProduct> products, BlobClient blobClient)
