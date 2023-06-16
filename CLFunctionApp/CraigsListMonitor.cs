@@ -162,7 +162,13 @@ namespace CLFunctionApp
         private async Task<BlobContainerClient> BuildBlobContainerClient()
         {
             var connString = _configuration.GetValue<string>("AzureWebJobsStorage");
+
             var client = new BlobContainerClient(connString, BLOB_CONTAINER_NAME);
+
+            var response = await client.CreateIfNotExistsAsync();
+
+            _logger.LogInformation("Creating client if not exists: ", response);
+
             return client;
         }
 
