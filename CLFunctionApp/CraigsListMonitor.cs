@@ -25,7 +25,12 @@ namespace CLFunctionApp
             SOLD_LISTINGS_DISCORD_WEBHOOK = configurationDictionary[nameof(SOLD_LISTINGS_DISCORD_WEBHOOK)];
             MONITOR_HEALTH_DISCORD_WEBHOOK = configurationDictionary[nameof(MONITOR_HEALTH_DISCORD_WEBHOOK)];
             CRAIGSLIST_SEARCH_URL = configurationDictionary[nameof(CRAIGSLIST_SEARCH_URL)];
-            LISTINGS_BLOB_NAME = configurationDictionary[nameof(LISTINGS_BLOB_NAME)] ?? "ListingDictionary";
+
+            if (!configurationDictionary.TryGetValue(nameof(LISTINGS_BLOB_NAME), out LISTINGS_BLOB_NAME))
+            {
+                LISTINGS_BLOB_NAME = "ListingDictionary";
+            }
+
         }
 
         /// <summary>
@@ -116,7 +121,7 @@ namespace CLFunctionApp
 
                 await UploadProductsToBlob(currentListings, blobClient);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 _logger.LogError(ex.Message, ex);
             }
