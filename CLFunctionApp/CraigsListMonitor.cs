@@ -70,7 +70,10 @@ namespace CLFunctionApp
             {
                 _logger.LogInformation($"C# Timer trigger function executed at: {DateTime.Now}");
                 _logger.LogInformation($"Next timer schedule at: {myTimer.ScheduleStatus.Next}");
-
+                _logger.LogInformation("Started with Parameters: ");
+                _logger.LogInformation($"LISTINGS_BLOB_NAME : {LISTINGS_BLOB_NAME}");
+                _logger.LogInformation($"BLOB_CONTAINER_NAME : {BLOB_CONTAINER_NAME}");
+                _logger.LogInformation($"CRAIGSLIST_SEARCH_URL : {CRAIGSLIST_SEARCH_URL}");
 
                 var httpClient = new HttpClient();
                 var discordLogger = new DiscordLogger(httpClient);
@@ -119,7 +122,10 @@ namespace CLFunctionApp
                     currentListings[listingKeyValue.Key] = listingKeyValue.Value;
                 }
 
-                await UploadProductsToBlob(currentListings, blobClient);
+                if (!await UploadProductsToBlob(currentListings, blobClient))
+                {
+                    _logger.LogError("Failed to create blob");
+                };
             }
             catch (Exception ex)
             {
