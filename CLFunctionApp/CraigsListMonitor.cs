@@ -135,9 +135,17 @@ namespace CLFunctionApp
 
         private async Task<Dictionary<string, CraigsListProduct>> GetPreviousListings(BlobClient blobClient)
         {
+
+            if (!await blobClient.ExistsAsync())
+            {
+                return new Dictionary<string, CraigsListProduct>();
+            }
+
             byte[] oldListingBytes;
 
             using (MemoryStream ms = new MemoryStream())
+
+
             using (var oldListingStream = await blobClient.OpenReadAsync())
             {
                 oldListingStream.CopyTo(ms);
@@ -155,7 +163,6 @@ namespace CLFunctionApp
         {
             var connString = _configuration.GetValue<string>("AzureWebJobsStorage");
             var client = new BlobContainerClient(connString, BLOB_CONTAINER_NAME);
-            await client.CreateIfNotExistsAsync();
             return client;
         }
 
