@@ -35,7 +35,7 @@ namespace FunctionApp1.Utility.cs
 
     }
 
-    public class ProductDictionaryFromResponseConverter : JsonConverter<Dictionary<string, CraigsListProduct>>
+    class ProductDictionaryFromResponseConverter : JsonConverter<Dictionary<string, CraigsListProduct>>
     {
         public override Dictionary<string, CraigsListProduct> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {

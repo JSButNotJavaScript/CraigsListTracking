@@ -1,5 +1,4 @@
 using CLFunctionApp.Utility.cs;
-using FunctionApp1.Utility.cs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -13,7 +12,7 @@ var host = new HostBuilder()
 static void ConfigureServices(IConfiguration configuration,
     IServiceCollection services)
 {
-    services.AddScoped<ICraigsListScraper, CraigslistSearchResultAPIFetcher>();
+    services.AddScoped<ICraigsListScraper, CraigsListWebDriverScraper>();
 }
 
 host.Run();

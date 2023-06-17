@@ -14,6 +14,7 @@ namespace CLFunctionApp
         private readonly ILogger _logger;
         private readonly IConfiguration _configuration;
         private readonly ICraigsListScraper _craigsListScraper;
+        private readonly DiscordLogger _discordLogger;
 
         public CraigsListMonitor(ILoggerFactory loggerFactory,
              IConfiguration configuration,
@@ -33,6 +34,9 @@ namespace CLFunctionApp
             {
                 LISTINGS_BLOB_NAME = "ListingDictionary";
             }
+
+            var httpClient = new HttpClient();
+            _discordLogger = new DiscordLogger(httpClient);
 
         }
 
@@ -78,9 +82,6 @@ namespace CLFunctionApp
                 _logger.LogInformation($"BLOB_CONTAINER_NAME : {BLOB_CONTAINER_NAME}");
                 _logger.LogInformation($"CRAIGSLIST_SEARCH_URL : {CRAIGSLIST_SEARCH_URL}");
 
-                var httpClient = new HttpClient();
-                var discordLogger = new DiscordLogger(httpClient);
-
                 var currentListings = await _craigsListScraper.ScrapeListings(CRAIGSLIST_SEARCH_URL);
 
                 var blobClient = await GetListingsBlobClient();
@@ -93,30 +94,26 @@ namespace CLFunctionApp
 
                 if (anyNewPosts)
                 {
-                    var postDiscordMessageSucceeded = true;
-                    if (anyNewPosts)
-                    {
-                        var description = "**NEW/UPDATED LISTINGS:**  \n" + string.Join(" \n", newlyPostedListings.Select(l => $"{l.Url}  ${(l.Price)}"));
-                        var header = $"{newlyPostedListings.Count} NEW POSTS ";
-                        var title = $"Fender Search Total Results: {currentListings.Count}";
+                    var description = "**NEW/UPDATED LISTINGS:**  \n" + string.Join(" \n", newlyPostedListings.Select(l => $"{l.Url}  ${(l.Price)}"));
+                    var header = $"{newlyPostedListings.Count} NEW POSTS ";
+                    var title = $"Total Search Total Results: {currentListings.Count}";
 
-                        postDiscordMessageSucceeded = await discordLogger.LogMesage(ADDED_LISTINGS_DISCORD_WEBHOOK, new DiscordMessage() { Description = description, Title = title, Header = header });
-                    }
+                    var discordMessages = newlyPostedListings
+                        .Select(l => new DiscordMessage() { ImageUrl = l.ImageUrl, Description = l.Url, Title = l.Price, Header = l.Title })
+                        .ToList();
+
+                    (var postDiscordMessageSucceeded, string[] errorMessages) = await _discordLogger.LogMessages(ADDED_LISTINGS_DISCORD_WEBHOOK, discordMessages);
+
 
                     if (!postDiscordMessageSucceeded)
                     {
-                        await discordLogger.LogMesage(MONITOR_HEALTH_DISCORD_WEBHOOK, new DiscordMessage() { Header = "FAILED TO POST UPDATE. ", Title = $"Previous listing had {previousListings.Count} results" });
+                        await _discordLogger.LogMessage(MONITOR_HEALTH_DISCORD_WEBHOOK,
+                            new DiscordMessage() { Header = "failed to post update. ", Title = $"previous listing had {previousListings.Count} results. Current listings now has {currentListings.Count}", Description = string.Join('\n', errorMessages) });
                     }
 
                 }
 
-                var loggingPeriodMinutes = 10;
-                // log health at most every _ minutes
-                if (DateTime.UtcNow.Minute % loggingPeriodMinutes == 0)
-                {
-                    await discordLogger.LogMesage(MONITOR_HEALTH_DISCORD_WEBHOOK, new DiscordMessage() { Header = "Azure Function still running. ", Title = $"Previous listing had {previousListings.Count} results" });
-                }
-
+                await LogMonitorHealth(previousListings.Count);
 
                 // store all listings that have been seen preivously
                 foreach (var listingKeyValue in previousListings)
@@ -132,6 +129,19 @@ namespace CLFunctionApp
             catch (Exception ex)
             {
                 _logger.LogError(ex, ex.Message);
+            }
+        }
+
+        private async Task LogMonitorHealth(int previousListingsCount)
+        {
+            var loggingFrequencyMinutes = 5;
+            var currentTime = DateTime.UtcNow;
+
+            var isTimeToLog = currentTime.Minute % loggingFrequencyMinutes == 0;
+
+            if (isTimeToLog)
+            {
+                await _discordLogger.LogMessage(MONITOR_HEALTH_DISCORD_WEBHOOK, new DiscordMessage() { Header = $"{nameof(CraigsListMonitor)} still running", Title = $"previous listing had {previousListingsCount} results" });
             }
         }
 
