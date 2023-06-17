@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Net.Http;
+using System.Text;
 using System.Text.Json;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
@@ -10,6 +11,12 @@ namespace FunctionApp1.Utility.cs
         private HttpClient _httpClient;
 
         private string _userName;
+
+        public DiscordLogger()
+        {
+            _userName = "webhook";
+            _httpClient =  new HttpClient();
+        }
 
         public DiscordLogger(HttpClient? httpClient, string userName = "webhook")
         {

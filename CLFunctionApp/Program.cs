@@ -1,4 +1,5 @@
 using CLFunctionApp.Utility.cs;
+using FunctionApp1.Utility.cs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -13,6 +14,7 @@ static void ConfigureServices(IConfiguration configuration,
     IServiceCollection services)
 {
     services.AddScoped<ICraigsListScraper, CraigsListWebDriverScraper>();
+    services.AddSingleton<DiscordLogger>();
 }
 
 host.Run();

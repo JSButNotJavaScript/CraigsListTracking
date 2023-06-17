@@ -18,7 +18,8 @@ namespace CLFunctionApp
 
         public CraigsListMonitor(ILoggerFactory loggerFactory,
              IConfiguration configuration,
-             ICraigsListScraper craigsListScraper)
+             ICraigsListScraper craigsListScraper,
+             DiscordLogger discordLogger)
         {
             _logger = loggerFactory.CreateLogger<CraigsListMonitor>();
             _configuration = configuration;
@@ -35,8 +36,7 @@ namespace CLFunctionApp
                 LISTINGS_BLOB_NAME = "ListingDictionary";
             }
 
-            var httpClient = new HttpClient();
-            _discordLogger = new DiscordLogger(httpClient);
+            _discordLogger = discordLogger;
 
         }
 
@@ -109,6 +109,8 @@ namespace CLFunctionApp
                     {
                         await _discordLogger.LogMessage(MONITOR_HEALTH_DISCORD_WEBHOOK,
                             new DiscordMessage() { Header = "failed to post update. ", Title = $"previous listing had {previousListings.Count} results. Current listings now has {currentListings.Count}", Description = string.Join('\n', errorMessages) });
+
+                        _logger.LogError("Failed to log one or more discord messages", errorMessages);
                     }
 
                 }
@@ -123,7 +125,7 @@ namespace CLFunctionApp
 
                 if (!await UploadProductsToBlob(currentListings, blobClient))
                 {
-                    _logger.LogError("Failed to create blob");
+                    _logger.LogError("Failed to upload listings");
                 };
             }
             catch (Exception ex)
