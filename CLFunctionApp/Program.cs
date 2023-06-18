@@ -13,7 +13,7 @@ var host = new HostBuilder()
 static void ConfigureServices(IConfiguration configuration,
     IServiceCollection services)
 {
-    services.AddScoped<ICraigsListScraper, CraigslistSearchResultAPIFetcher>();
+    services.AddScoped<ICraigsListScraper, CraigsListWebDriverScraper>();
     services.AddSingleton<DiscordLogger>();
 }
 
