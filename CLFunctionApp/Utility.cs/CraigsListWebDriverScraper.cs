@@ -36,7 +36,7 @@ namespace CLFunctionApp.Utility.cs
         public async Task<IDictionary<string, CraigsListProduct>> ScrapeListings(string url)
         {
             var chromeOptions = new ChromeOptions();
-            //chromeOptions.AddArguments("--headless");
+            chromeOptions.AddArguments("--headless");
 
             var chromeDriver = new ChromeDriver(chromeOptions);
 
