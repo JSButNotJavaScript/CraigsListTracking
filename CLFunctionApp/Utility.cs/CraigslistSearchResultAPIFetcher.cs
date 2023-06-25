@@ -23,9 +23,11 @@ namespace FunctionApp1.Utility.cs
                 throw new Exception("Status Code from CraigsList request did not indicate success");
             }
 
-            var contentStream = await response.Content.ReadAsStringAsync();
+            var responseString = await response.Content.ReadAsStringAsync();
 
-            var products = JsonSerializer.Deserialize<Dictionary<string, CraigsListProduct>>(contentStream, new JsonSerializerOptions()
+            var contentStreamJSONSubstring = ExtractDeserializableJSON(responseString);
+
+            var products = JsonSerializer.Deserialize<Dictionary<string, CraigsListProduct>>(contentStreamJSONSubstring, new JsonSerializerOptions()
             {
                 Converters = { new ProductDictionaryFromResponseConverter() }
             });
@@ -33,7 +35,27 @@ namespace FunctionApp1.Utility.cs
             return products;
         }
 
+        private string ExtractDeserializableJSON(string responseContentString)
+        {
+            var openingBraceIndex = responseContentString.IndexOf('{');
+
+            int closingBraceIndex = -1;
+
+            for (var i = responseContentString.Length - 1; i >= 0 && closingBraceIndex == -1; i--)
+            {
+                var currentCharacter = responseContentString[i];
+                if (currentCharacter == '}')
+                {
+                    closingBraceIndex = i;
+                }
+            }
+
+            var contentStreamJSONSubstring = responseContentString.Substring(openingBraceIndex, closingBraceIndex - openingBraceIndex + 1);
+
+            return contentStreamJSONSubstring;
+        }
     }
+
 
     class ProductDictionaryFromResponseConverter : JsonConverter<Dictionary<string, CraigsListProduct>>
     {
@@ -61,11 +83,6 @@ namespace FunctionApp1.Utility.cs
                         Price = price.ToString(),
                         Url = title.ToString(),
                     };
-
-                    if (dictionary.ContainsKey(title))
-                    {
-                        var a = item;
-                    }
 
                     dictionary[title] = product;
                 }
