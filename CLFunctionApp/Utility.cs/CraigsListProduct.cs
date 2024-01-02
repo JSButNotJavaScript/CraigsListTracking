@@ -12,5 +12,8 @@ namespace FunctionApp1.Utility.cs
         public string? ImageUrl { get; set; }
 
         public string? Title { get; set; }
+
+        public List<string> ImageUrls { get; set; } = new List<string>();
+
     }
 }

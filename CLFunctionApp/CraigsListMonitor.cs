@@ -99,7 +99,7 @@ namespace CLFunctionApp
                     var title = $"Total Search Total Results: {currentListings.Count}";
 
                     var discordMessages = newlyPostedListings
-                        .Select(l => new DiscordMessage() { ImageUrl = l.ImageUrl, Description = l.Url, Title = l.Price, Header = l.Title })
+                        .Select(l => new DiscordMessage() { ImageUrl = l.ImageUrls.FirstOrDefault(), Description = l.Url, Title = l.Price, Header = l.Title })
                         .ToList();
 
                     (var postDiscordMessageSucceeded, string[] errorMessages) = await _discordLogger.LogMessages(ADDED_LISTINGS_DISCORD_WEBHOOK, discordMessages);

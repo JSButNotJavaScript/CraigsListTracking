@@ -78,10 +78,20 @@ namespace FunctionApp1.Utility.cs
                     var price = item[3].ToString();
                     var title = item.EnumerateArray().Last().ToString();
 
+                    var imageUrls = item[5]
+                        .EnumerateArray()
+                        .Select(s => s.ToString())
+                        // only valid image URls seem to begin with this
+                        .Where(s => s.StartsWith("3:0"))
+                        // format URL by removing the "3:" and constructing 
+                        .Select(s => $"https://images.craigslist.org/{s.Substring(2)}_600x450.jpg")
+                        .ToList();
+
                     var product = new CraigsListProduct()
                     {
                         Price = price.ToString(),
                         Url = title.ToString(),
+                        ImageUrls = imageUrls
                     };
 
                     dictionary[title] = product;
